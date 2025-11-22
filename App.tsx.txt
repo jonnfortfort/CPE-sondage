@@ -3,10 +3,11 @@ declare const process: any;
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 
-// --- 1. CONFIGURATION ---
+// ==========================================
+// 1. CONFIGURATION & CONSTANTS
+// ==========================================
 const RESEARCHER_EMAIL = "penghann@hotmail.com"; 
 
-// --- 2. TYPES ---
 enum QuestionCategory {
   INTRO = 'INTRO',
   CONTEXT = 'CONTEXT',
@@ -26,25 +27,6 @@ interface Question {
   isInfoOnly?: boolean;
 }
 
-interface ResponseData {
-  text: string;
-  selectedTags: string[];
-}
-
-interface SurveyResponse {
-  [questionId: string]: ResponseData;
-}
-
-interface AiAnalysisResult {
-  personaTitle: string;
-  summary: string;
-  topPainPoints: string[];
-  suggestion: string;
-  sentimentScore: number;
-  categoryScores: { label: string; score: number; }[];
-}
-
-// --- 3. DATA ---
 const SURVEY_DATA: Question[] = [
   {
     id: 'intro_01',
@@ -219,18 +201,41 @@ const SURVEY_DATA: Question[] = [
   }
 ];
 
-// --- 4. SERVICES ---
+// ==========================================
+// 2. TYPES & INTERFACES
+// ==========================================
+interface ResponseData {
+  text: string;
+  selectedTags: string[];
+}
+
+interface SurveyResponse {
+  [questionId: string]: ResponseData;
+}
+
+interface AiAnalysisResult {
+  personaTitle: string;
+  summary: string;
+  topPainPoints: string[];
+  suggestion: string;
+  sentimentScore: number;
+  categoryScores: { label: string; score: number; }[];
+}
+
+// ==========================================
+// 3. AI SERVICE (MERGED)
+// ==========================================
 const analyzeSurvey = async (
   responses: SurveyResponse,
   questions: Question[]
 ): Promise<AiAnalysisResult> => {
-  // Local Fallback
+  // Fallback local if no key
   if (!process.env.API_KEY) {
     return {
       personaTitle: "Mode Démo",
-      summary: "Clé API manquante. Mode simulation activé. (Configurez API_KEY dans Vercel/Netlify pour utiliser l'IA)",
+      summary: "Clé API manquante. Mode simulation activé.",
       topPainPoints: ["Simulation locale", "Pas d'IA connectée"],
-      suggestion: "Connectez votre clé API.",
+      suggestion: "Connectez votre clé API dans Netlify.",
       sentimentScore: 70,
       categoryScores: [
         { label: "Sécurité", score: 5 },
@@ -292,7 +297,10 @@ const analyzeSurvey = async (
   }
 };
 
-// --- 5. COMPONENT: ANALYSIS VIEW ---
+// ==========================================
+// 4. COMPONENTS (MERGED)
+// ==========================================
+
 const AnalysisView: React.FC<{
   result: AiAnalysisResult | null;
   loading: boolean;
@@ -326,47 +334,63 @@ const AnalysisView: React.FC<{
     }
   };
 
-  if (loading) return <div className="text-center p-10 animate-pulse text-2xl">Analyse en cours...</div>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center animate-pulse text-2xl font-bold text-slate-600">Analyse en cours...</div>
+    </div>
+  );
+  
   if (!result) return null;
 
   return (
-    <div className="max-w-4xl mx-auto p-8 bg-white rounded-3xl shadow-xl">
+    <div className="max-w-4xl mx-auto p-8 bg-white rounded-3xl shadow-xl m-4">
       <h2 className="text-4xl font-bold text-center mb-4">{result.personaTitle}</h2>
       <p className="text-center text-gray-600 mb-8">{result.summary}</p>
       
       <div className="grid md:grid-cols-2 gap-8 mb-8">
         <div className="bg-slate-50 p-6 rounded-xl text-center">
           <h3 className="font-bold text-slate-400 uppercase">Moral</h3>
-          <div className="text-5xl font-bold text-sky-500">{result.sentimentScore}%</div>
+          <div className="text-6xl font-bold text-sky-500 mt-4">{result.sentimentScore}%</div>
         </div>
         <div className="bg-slate-50 p-6 rounded-xl">
           <h3 className="font-bold text-slate-400 uppercase mb-4">Scores</h3>
           {result.categoryScores.map((c, i) => (
-             <div key={i} className="mb-2">
-               <div className="flex justify-between text-sm"><span>{c.label}</span><span>{c.score}/10</span></div>
-               <div className="h-2 bg-slate-200 rounded-full"><div style={{width: `${c.score*10}%`}} className="h-full bg-blue-500 rounded-full"></div></div>
+             <div key={i} className="mb-3">
+               <div className="flex justify-between text-sm font-bold mb-1"><span>{c.label}</span><span>{c.score}/10</span></div>
+               <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
+                 <div style={{width: `${c.score*10}%`}} className="h-full bg-blue-500 rounded-full"></div>
+               </div>
              </div>
           ))}
         </div>
       </div>
 
+      <div className="bg-white border border-rose-100 p-6 rounded-xl mb-8 shadow-sm">
+        <h3 className="font-bold text-rose-500 mb-2">Points de friction</h3>
+        <ul className="list-disc list-inside text-slate-700">
+          {result.topPainPoints.map((p, i) => <li key={i}>{p}</li>)}
+        </ul>
+      </div>
+
       <div className="text-center space-y-4">
         {!emailSent ? 
-          <button onClick={handleSendResults} disabled={isSending} className="bg-sky-500 text-white px-8 py-3 rounded-xl font-bold">
+          <button onClick={handleSendResults} disabled={isSending} className="bg-sky-500 hover:bg-sky-600 text-white px-8 py-3 rounded-xl font-bold transition-colors shadow-lg">
             {isSending ? "Envoi..." : "Envoyer mes réponses"}
           </button> : 
-          <div className="text-green-500 font-bold">Envoyé !</div>
+          <div className="text-green-500 font-bold text-xl p-4 bg-green-50 rounded-xl">Réponses envoyées avec succès !</div>
         }
-        <div className="flex justify-center gap-4 text-slate-400">
-           <button onClick={() => window.print()}>Sauvegarder PDF</button>
-           <button onClick={onRestart}>Recommencer</button>
+        <div className="flex justify-center gap-4 text-slate-400 pt-4">
+           <button onClick={() => window.print()} className="hover:text-slate-600 underline">Sauvegarder PDF</button>
+           <button onClick={onRestart} className="hover:text-slate-600 underline">Recommencer</button>
         </div>
       </div>
     </div>
   );
 };
 
-// --- 6. MAIN APP ---
+// ==========================================
+// 5. MAIN APP COMPONENT
+// ==========================================
 const App: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [responses, setResponses] = useState<SurveyResponse>({});
@@ -384,6 +408,7 @@ const App: React.FC = () => {
   const isValid = currentQuestion.isInfoOnly || !isMandatory || (currentResponse.text && currentResponse.text.trim().length > 0);
 
   const handleNext = async () => {
+    if (!isValid && currentIndex !== 0) return;
     if (isLastQuestion) {
        setIsFinished(true);
        setAnalysisLoading(true);
@@ -412,48 +437,81 @@ const App: React.FC = () => {
 
   if (isFinished) return <div className="min-h-screen bg-slate-50 py-12"><AnalysisView result={analysisResult} loading={analysisLoading} responses={responses} onRestart={() => window.location.reload()} /></div>;
 
+  // Home Screen
   if (currentIndex === 0) {
      return (
         <div className="relative h-screen w-full bg-slate-900 overflow-hidden">
            <img src={bgImage || currentQuestion.imageUrl} className="absolute inset-0 w-full h-full object-cover opacity-60" />
-           <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
-              <h1 className="text-5xl font-extrabold text-white mb-6">{currentQuestion.text}</h1>
-              <button onClick={() => fileInputRef.current?.click()} className="absolute top-6 right-6 p-2 bg-white/20 rounded-full text-white">📷</button>
+           <div className="absolute inset-0 bg-black/40"></div>
+           <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4 max-w-5xl mx-auto">
+              <span className="mb-6 px-4 py-1 border border-white/30 rounded-full text-white/80 text-sm uppercase tracking-widest">{currentQuestion.tags.join(' • ')}</span>
+              <h1 className="text-5xl md:text-7xl font-extrabold text-white mb-8 drop-shadow-xl leading-tight">{currentQuestion.text}</h1>
+              <button onClick={() => fileInputRef.current?.click()} className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 backdrop-blur rounded-full text-white transition-all" title="Changer l'image">📷</button>
               <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-              <button onClick={handleNext} className="px-10 py-4 bg-white text-slate-900 font-bold rounded-full hover:scale-105 transition-transform">Commencer</button>
+              <button onClick={handleNext} className="px-12 py-5 bg-white text-slate-900 text-xl font-bold rounded-full hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] transition-all flex items-center">
+                Commencer <span className="ml-2">→</span>
+              </button>
            </div>
         </div>
      );
   }
 
+  // Question Screen
+  const getCategoryColor = (c: string) => {
+    if(c === 'PRATIQUES') return 'bg-sky-50';
+    if(c === 'DIFFICULTES') return 'bg-orange-50';
+    if(c === 'BESOINS') return 'bg-indigo-50';
+    return 'bg-slate-50';
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
-       <div className="max-w-3xl w-full bg-white rounded-3xl shadow-xl overflow-hidden p-8 md:p-12">
-          <div className="w-full bg-slate-100 h-2 rounded-full mb-8"><div className="bg-sky-500 h-full transition-all" style={{width: `${(currentIndex/SURVEY_DATA.length)*100}%`}}></div></div>
-          <div className="mb-6"><span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-full">{currentQuestion.category}</span></div>
-          <h2 className="text-3xl font-bold text-slate-800 mb-8">{currentQuestion.text} {isMandatory && <span className="text-red-500">*</span>}</h2>
+    <div className={`min-h-screen flex items-center justify-center p-4 ${getCategoryColor(currentQuestion.category)} transition-colors duration-500`}>
+       <div className="max-w-3xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col min-h-[600px]">
+          <div className="w-full bg-slate-100 h-2"><div className="bg-sky-500 h-full transition-all duration-500" style={{width: `${(currentIndex/SURVEY_DATA.length)*100}%`}}></div></div>
           
-          {currentQuestion.isInfoOnly ? (
-             <div className="bg-sky-50 p-8 rounded-2xl border-l-4 border-sky-500 text-sky-900 font-semibold text-lg">{currentQuestion.placeholder}</div>
-          ) : (
-             <div className="space-y-6">
-                <div className="flex flex-wrap gap-2">
-                   {currentQuestion.answerTags?.map(tag => (
-                      <button key={tag} onClick={() => handleTagToggle(tag)} className={`px-4 py-2 rounded-full font-bold border-2 ${currentResponse.selectedTags.includes(tag) ? 'bg-sky-600 text-white border-sky-600' : 'text-slate-500 border-slate-100'}`}>{tag}</button>
-                   ))}
-                </div>
-                <textarea 
-                  value={currentResponse.text} 
-                  onChange={e => setResponses({...responses, [currentQuestion.id]: {...currentResponse, text: e.target.value}})}
-                  className="w-full h-48 p-4 border-2 border-slate-100 rounded-2xl focus:border-sky-500 outline-none resize-none"
-                  placeholder={currentQuestion.placeholder}
-                />
-             </div>
-          )}
-          
-          <div className="mt-10 flex justify-between">
-             <button onClick={() => setCurrentIndex(c => c - 1)} className="text-slate-400 font-bold">Retour</button>
-             <button onClick={handleNext} disabled={!isValid} className={`px-8 py-3 rounded-xl font-bold ${isValid ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-300'}`}>Suivant</button>
+          <div className="p-8 md:p-12 flex flex-col flex-grow">
+            <div className="mb-6 flex justify-between items-center">
+              <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-full tracking-widest">{currentQuestion.category}</span>
+              <div className="text-xs text-slate-400">{currentIndex + 1} / {SURVEY_DATA.length}</div>
+            </div>
+            
+            <h2 className="text-3xl font-bold text-slate-800 mb-8 leading-snug">
+              {currentQuestion.text} 
+              {isMandatory && <span className="text-rose-500 ml-2 text-xl align-top">*</span>}
+            </h2>
+            
+            <div className="flex-grow">
+              {currentQuestion.isInfoOnly ? (
+                 <div className="bg-sky-50 p-8 rounded-2xl border-l-4 border-sky-500 text-sky-900">
+                    <p className="text-xl font-semibold mb-2">{currentQuestion.placeholder}</p>
+                    <p className="text-sm text-sky-600 mt-4 uppercase font-bold tracking-wide">→ Cliquez sur Suivant pour continuer</p>
+                 </div>
+              ) : (
+                 <div className="space-y-6">
+                    {currentQuestion.answerTags && (
+                      <div className="flex flex-wrap gap-2">
+                         {currentQuestion.answerTags.map(tag => (
+                            <button key={tag} onClick={() => handleTagToggle(tag)} className={`px-4 py-2 rounded-full font-bold text-sm border-2 transition-all ${currentResponse.selectedTags.includes(tag) ? 'bg-sky-600 text-white border-sky-600 shadow-md' : 'text-slate-500 border-slate-100 hover:border-sky-200'}`}>{tag}</button>
+                         ))}
+                      </div>
+                    )}
+                    <textarea 
+                      value={currentResponse.text} 
+                      onChange={e => setResponses({...responses, [currentQuestion.id]: {...currentResponse, text: e.target.value}})}
+                      className={`w-full h-48 p-5 border-2 rounded-2xl outline-none resize-none transition-all text-lg ${!isValid && isMandatory ? 'border-rose-200 bg-rose-50 focus:border-rose-400' : 'border-slate-100 bg-slate-50 focus:bg-white focus:border-sky-500 focus:shadow-md'}`}
+                      placeholder={currentQuestion.placeholder || "Écrivez votre réponse ici..."}
+                    />
+                    {!isValid && isMandatory && <p className="text-rose-500 text-sm font-bold animate-pulse">Réponse requise</p>}
+                 </div>
+              )}
+            </div>
+            
+            <div className="mt-10 pt-6 border-t border-slate-100 flex justify-between items-center">
+               <button onClick={() => setCurrentIndex(c => c - 1)} className="text-slate-400 font-bold hover:text-slate-700 transition-colors flex items-center"><span className="mr-2">←</span> Retour</button>
+               <button onClick={handleNext} disabled={!isValid && currentIndex !== 0} className={`px-8 py-3 rounded-xl font-bold transition-all transform hover:-translate-y-1 shadow-lg ${isValid || currentIndex === 0 ? 'bg-slate-900 text-white hover:bg-sky-600' : 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none'}`}>
+                 {isLastQuestion ? 'Terminer' : 'Suivant'} <span className="ml-2">→</span>
+               </button>
+            </div>
           </div>
        </div>
     </div>
